@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=380" />
+    <title>CheckMate</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Titre principal -->
+      <h1 class="title">♟️ CheckMate</h1>
+
+      <!-- Indicateur de statut de configuration -->
+      <div id="config-status" class="config-status not-configured">
+        ⚠️ Non configuré
+      </div>
+
+      <!-- Section Identifiants -->
+      <section class="section">
+        <h2 class="section-title">🔐 Identifiants</h2>
+        <div class="field-group">
+          <label for="username">Identifiant</label>
+          <input
+            type="text"
+            id="username"
+            placeholder="Votre identifiant"
+            autocomplete="off"
+          />
+        </div>
+        <div class="field-group">
+          <label for="password">Mot de passe</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="Votre mot de passe"
+            autocomplete="off"
+          />
+        </div>
+      </section>
+
+      <!-- Section Signature -->
+      <section class="section">
+        <h2 class="section-title">✍️ Signature</h2>
+        <div class="canvas-wrapper">
+          <canvas id="signature-canvas" width="320" height="150"></canvas>
+          <div id="canvas-placeholder" class="canvas-placeholder">
+            Dessinez votre signature ici
+          </div>
+        </div>
+        <button id="btn-clear" class="btn btn-clear">🗑️ Effacer</button>
+      </section>
+
+      <!-- Boutons d'actions -->
+      <div class="actions">
+        <button id="btn-save" class="btn btn-save">💾 Sauvegarder</button>
+        <button id="btn-start" class="btn btn-start">
+          ▶️ Pointer ma présence
+        </button>
+      </div>
+
+      <!-- Section statut -->
+      <div id="status-bar" class="status-bar">Aucune action effectuée</div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

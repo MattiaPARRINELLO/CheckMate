@@ -1,0 +1,408 @@
+// =============================================
+// Pointage Auto — Service Worker (background.js)
+// Orchestre les étapes du pointage automatisé
+// =============================================
+
+// --- Constantes ---
+const URL_CONNEXION = 'https://cesar.emineo-informatique.fr/connexion';
+const URL_TABLEAU_BORD = 'https://cesar.emineo-informatique.fr/';
+const TIMEOUT_CHARGEMENT = 30000; // 30 secondes (site lent)
+const TIMEOUT_REDIRECTION = 30000; // 30 secondes (site lent)
+
+/**
+ * Log horodaté pour faciliter le debug
+ * @param {string} tag - Catégorie du log (ex: 'Étape 1')
+ * @param {string} message - Message à afficher
+ */
+function log(tag, message) {
+  const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+  console.log(`[${now}][${tag}] ${message}`);
+}
+
+// =============================================
+// UTILITAIRES
+// =============================================
+
+/**
+ * Affiche une notification Chrome
+ * @param {string} titre - Titre de la notification
+ * @param {string} message - Corps de la notification
+ */
+function afficherNotification(titre, message) {
+  chrome.notifications.create({
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: titre,
+    message: message
+  }, (notificationId) => {
+    if (chrome.runtime.lastError) {
+      console.warn('Notification échouée:', chrome.runtime.lastError.message);
+    }
+  });
+}
+
+/**
+ * Attend qu'un onglet soit complètement chargé
+ * @param {number} tabId - ID de l'onglet
+ * @param {number} timeout - Timeout en millisecondes
+ * @returns {Promise<void>}
+ */
+function attendreChargementOnglet(tabId, timeout = TIMEOUT_CHARGEMENT) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error('Timeout : la page n\'a pas fini de charger'));
+    }, timeout);
+
+    function listener(updatedTabId, changeInfo) {
+      if (updatedTabId === tabId && changeInfo.status === 'complete') {
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(listener);
+        // Petit délai supplémentaire pour que le DOM soit bien prêt
+        setTimeout(resolve, 500);
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+/**
+ * Attend que l'URL d'un onglet change (redirection post-connexion)
+ * @param {number} tabId - ID de l'onglet
+ * @param {string} urlActuelle - URL avant la redirection
+ * @param {number} timeout - Timeout en millisecondes
+ * @returns {Promise<string>} La nouvelle URL
+ */
+function attendreRedirection(tabId, urlActuelle, timeout = TIMEOUT_REDIRECTION) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      reject(new Error('Connexion échouée, vérifiez vos identifiants'));
+    }, timeout);
+
+    function listener(updatedTabId, changeInfo, tab) {
+      if (updatedTabId === tabId && changeInfo.status === 'complete') {
+        // Vérifier que l'URL a changé (n'est plus la page de connexion)
+        if (tab.url && !tab.url.includes('/connexion')) {
+          clearTimeout(timer);
+          chrome.tabs.onUpdated.removeListener(listener);
+          // Délai pour que le DOM de la nouvelle page soit prêt
+          setTimeout(() => resolve(tab.url), 500);
+        }
+      }
+    }
+
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+}
+
+/**
+ * Exécute un script dans un onglet via chrome.scripting.executeScript
+ * @param {number} tabId - ID de l'onglet
+ * @param {Function} func - Fonction à exécuter
+ * @param {Array} args - Arguments à passer à la fonction
+ * @returns {Promise<any>} Résultat de l'exécution
+ */
+async function executerScript(tabId, func, args = []) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: func,
+      args: args
+    });
+    if (results && results[0]) {
+      return results[0].result;
+    }
+    return null;
+  } catch (erreur) {
+    console.error('Erreur d\'exécution de script:', erreur);
+    throw new Error(`Erreur d'injection de script : ${erreur.message}`);
+  }
+}
+
+// =============================================
+// DÉTECTION DE SESSION ACTIVE
+// =============================================
+
+/**
+ * Vérifie si l'utilisateur est déjà connecté après chargement de la page de connexion.
+ * Contrôle deux indicateurs :
+ *  - L'URL de l'onglet (si elle n'est plus /connexion → redirection serveur immédiate)
+ *  - La présence du calendrier TOASTUI dans le DOM (indicateur côté client)
+ * Attend jusqu'à 4 secondes pour laisser le temps à la redirection de s'opérer.
+ * @param {number} tabId - ID de l'onglet
+ * @returns {Promise<boolean>} true si déjà connecté
+ */
+async function verifierSiDejaConnecte(tabId) {
+  // Vérification 1 : l'URL a-t-elle déjà changé immédiatement ?
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    log('Session', `URL actuelle: ${tab.url}`);
+    if (!tab.url.includes('/connexion')) {
+      log('Session', `Redirection immédiate détectée vers: ${tab.url}`);
+      return true;
+    }
+  } catch (e) {
+    log('Session', `Erreur lors de la vérification d'URL: ${e.message}`);
+    return false;
+  }
+
+  // Vérification 2 : attendre jusqu'à 4 secondes et surveiller le DOM
+  // Le calendrier TOASTUI peut apparaître après quelques secondes si la session est encore active
+  const INTERVALLE_MS = 500;  // vérification toutes les 500ms
+  const MAX_TENTATIVES = 8;   // 8 × 500ms = 4 secondes max
+
+  log('Session', `Surveillance DOM pendant ${MAX_TENTATIVES * INTERVALLE_MS}ms (${MAX_TENTATIVES} tentatives)...`);
+  for (let i = 0; i < MAX_TENTATIVES; i++) {
+    await new Promise(resolve => setTimeout(resolve, INTERVALLE_MS));
+
+    // Vérifier si l'URL a changé (redirection serveur différée)
+    try {
+      const tabActuelle = await chrome.tabs.get(tabId);
+      if (!tabActuelle.url.includes('/connexion')) {
+        log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — redirection détectée vers: ${tabActuelle.url}`);
+        return true;
+      }
+    } catch (e) {
+      log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — onglet fermé ou inaccessible`);
+      return false;
+    }
+
+    // Vérifier la présence du calendrier TOASTUI dans le DOM
+    try {
+      const calendrierPresent = await executerScript(tabId, () => {
+        return !!document.querySelector(
+          'div.toastui-calendar-layout.toastui-calendar-day-view'
+        );
+      });
+      if (calendrierPresent) {
+        log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — calendrier TOASTUI détecté, session active`);
+        return true;
+      }
+    } catch (e) {
+      log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — injection impossible (page en chargement)`);
+    }
+  }
+
+  log('Session', 'Aucun indicateur de session active trouvé après toutes les tentatives');
+  return false;
+}
+
+// =============================================
+// ÉTAPES DU POINTAGE
+// =============================================
+
+/**
+ * ÉTAPE 1 — Ouvrir la page de connexion dans un nouvel onglet
+ * @returns {Promise<number>} ID de l'onglet créé
+ */
+async function etape1_ouvrirPageConnexion() {
+  try {
+    log('Étape 1', `Création onglet vers ${URL_CONNEXION}...`);
+    const tab = await chrome.tabs.create({ url: URL_CONNEXION, active: true });
+    log('Étape 1', `Onglet créé (tabId=${tab.id}), attente du chargement complet (timeout ${TIMEOUT_CHARGEMENT}ms)...`);
+    await attendreChargementOnglet(tab.id);
+    log('Étape 1', 'Page de connexion chargée');
+    return tab.id;
+  } catch (erreur) {
+    throw new Error(`Étape 1 — Impossible d'ouvrir la page : ${erreur.message}`);
+  }
+}
+
+/**
+ * ÉTAPE 2 — Remplir les champs et soumettre le formulaire de connexion
+ * Fonction exécutée DANS l'onglet via chrome.scripting.executeScript
+ * @param {string} username - Identifiant
+ * @param {string} password - Mot de passe
+ * @returns {boolean} true si le formulaire a été soumis
+ */
+function scriptRemplirFormulaire(username, password) {
+  try {
+    // Récupérer le setter natif pour contourner les frameworks JS (React, etc.)
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, 'value'
+    ).set;
+
+    // --- Champ identifiant ---
+    const champUsername = document.querySelector('input#username');
+    if (!champUsername) {
+      throw new Error('Champ identifiant introuvable (input#username)');
+    }
+    champUsername.focus();
+    champUsername.dispatchEvent(new Event('focus', { bubbles: true }));
+    nativeInputValueSetter.call(champUsername, username);
+    champUsername.dispatchEvent(new Event('input', { bubbles: true }));
+    champUsername.dispatchEvent(new Event('change', { bubbles: true }));
+    champUsername.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    // --- Champ mot de passe ---
+    const champPassword = document.querySelector('input#password');
+    if (!champPassword) {
+      throw new Error('Champ mot de passe introuvable (input#password)');
+    }
+    champPassword.focus();
+    champPassword.dispatchEvent(new Event('focus', { bubbles: true }));
+    nativeInputValueSetter.call(champPassword, password);
+    champPassword.dispatchEvent(new Event('input', { bubbles: true }));
+    champPassword.dispatchEvent(new Event('change', { bubbles: true }));
+    champPassword.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    // --- Bouton de connexion ---
+    const boutonConnexion = document.querySelector('button[type="submit"].btn-primary');
+    if (!boutonConnexion) {
+      throw new Error('Bouton de connexion introuvable (button[type="submit"].btn-primary)');
+    }
+    boutonConnexion.click();
+
+    return true;
+  } catch (erreur) {
+    return { error: erreur.message };
+  }
+}
+
+/**
+ * ÉTAPE 2 — Remplir et soumettre le formulaire
+ * @param {number} tabId - ID de l'onglet
+ * @param {string} username - Identifiant
+ * @param {string} password - Mot de passe
+ */
+async function etape2_remplirFormulaire(tabId, username, password) {
+  try {
+    log('Étape 2', 'Injection du script de remplissage...');
+    const resultat = await executerScript(tabId, scriptRemplirFormulaire, [username, password]);
+    if (resultat && resultat.error) {
+      log('Étape 2', `Erreur côté page: ${resultat.error}`);
+      throw new Error(resultat.error);
+    }
+    log('Étape 2', 'Formulaire rempli et soumis avec succès');
+  } catch (erreur) {
+    throw new Error(`Étape 2 — Échec du remplissage : ${erreur.message}`);
+  }
+}
+
+/**
+ * ÉTAPE 3 — Attendre la redirection après connexion
+ * @param {number} tabId - ID de l'onglet
+ */
+async function etape3_attendreRedirection(tabId) {
+  try {
+    log('Étape 3', `Attente de la redirection (timeout ${TIMEOUT_REDIRECTION}ms)...`);
+    const nouvelleUrl = await attendreRedirection(tabId, URL_CONNEXION);
+    log('Étape 3', `Redirection réussie vers: ${nouvelleUrl}`);
+    return nouvelleUrl;
+  } catch (erreur) {
+    throw new Error(`Étape 3 — ${erreur.message}`);
+  }
+}
+
+
+// =============================================
+// ORCHESTRATEUR PRINCIPAL
+// =============================================
+
+/**
+ * Exécute toutes les étapes du pointage séquentiellement
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+async function lancerPointage() {
+  let tabId = null;
+
+  try {
+    // Récupérer les identifiants depuis le stockage
+    const data = await chrome.storage.local.get(['username', 'password', 'signatureData']);
+
+    if (!data.username || !data.password) {
+      throw new Error('Identifiants non configurés');
+    }
+
+    // ÉTAPE 1 — Ouvrir la page de connexion
+    log('Pointage', 'Démarrage — Étape 1 : ouverture de la page de connexion');
+    afficherNotification('🕐 Pointage Auto', 'Ouverture de la page de connexion...');
+    tabId = await etape1_ouvrirPageConnexion();
+    log('Pointage', `Étape 1 terminée — onglet créé (tabId=${tabId})`);
+
+    // VÉRIFICATION — Session déjà active ?
+    log('Pointage', 'Vérification de la session existante...');
+    const dejaConnecte = await verifierSiDejaConnecte(tabId);
+    log('Pointage', `Résultat vérification session : ${dejaConnecte ? 'CONNECTÉ' : 'NON CONNECTÉ'}`);
+
+    if (dejaConnecte) {
+      // L'utilisateur est déjà connecté → passer directement à la signature
+      log('Pointage', 'Session active détectée — étapes 2 et 3 ignorées, passage à la signature');
+      afficherNotification('✅ Pointage Auto', 'Déjà connecté ! Lancement de la signature...');
+    } else {
+
+      // ÉTAPE 2 — Remplir le formulaire et le soumettre (uniquement si pas encore connecté)
+      log('Pointage', 'Étape 2 — Remplissage du formulaire de connexion...');
+      afficherNotification('🕐 Pointage Auto', 'Connexion en cours...');
+      await etape2_remplirFormulaire(tabId, data.username, data.password);
+      log('Pointage', 'Étape 2 terminée — formulaire soumis');
+
+      // ÉTAPE 3 — Attendre la redirection post-connexion
+      log('Pointage', 'Étape 3 — Attente de la redirection post-connexion (timeout 30s)...');
+      await etape3_attendreRedirection(tabId);
+
+      log('Pointage', 'Étape 3 terminée — redirection détectée, connexion réussie');
+      afficherNotification('✅ Pointage Auto', 'Connexion réussie ! Lancement de la signature...');
+    } // fin du else (connexion nécessaire)
+
+    // ÉTAPE 4 — Lancer la signature automatique via le content script
+    log('Pointage', `Étape 4 — Envoi du message 'lancerSignature' au content script (tabId=${tabId})...`);
+    afficherNotification('🕐 Pointage Auto', 'Signature en cours...');
+
+    const resultatSignature = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, { action: 'lancerSignature' }, (response) => {
+        if (chrome.runtime.lastError) {
+          log('Pointage', `Erreur sendMessage: ${chrome.runtime.lastError.message}`);
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+        } else {
+          log('Pointage', `Réponse du content script: ${JSON.stringify(response)}`);
+          resolve(response || { success: false, error: 'Aucune réponse du content script' });
+        }
+      });
+    });
+
+    if (!resultatSignature.success) {
+      log('Pointage', `Étape 4 échouée: ${resultatSignature.error}`);
+      throw new Error(resultatSignature.error || 'Échec de la signature');
+    }
+
+    // Signature réussie — Notification finale
+    log('Pointage', 'Étape 4 terminée — Signature validée avec succès !');
+    afficherNotification('✅ Pointage Auto', 'Présence pointée et signée avec succès !');
+
+    return {
+      success: true,
+      message: 'Présence pointée et signée avec succès !'
+    };
+
+  } catch (erreur) {
+    log('Pointage', `ERREUR FATALE: ${erreur.message}`);
+    console.error('[Pointage] Stack:', erreur.stack);
+    afficherNotification('❌ Pointage Auto — Erreur', erreur.message);
+
+    return {
+      success: false,
+      error: erreur.message
+    };
+  }
+}
+
+// =============================================
+// ÉCOUTEUR DE MESSAGES
+// =============================================
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'lancerPointage') {
+    // Exécuter le pointage de manière asynchrone et répondre au popup
+    lancerPointage().then((resultat) => {
+      sendResponse(resultat);
+    }).catch((erreur) => {
+      sendResponse({ success: false, error: erreur.message });
+    });
+
+    // Retourner true pour indiquer qu'on enverra la réponse de manière asynchrone
+    return true;
+  }
+});
