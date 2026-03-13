@@ -626,6 +626,30 @@ body {
   animation: none;
 }
 
+/* -- Report bug button -- */
+
+.btn-report-bug {
+  width: auto;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  align-self: center;
+}
+
+.btn-report-bug:hover {
+  color: #dbeafe;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.38);
+}
+
+.btn-report-bug::after {
+  display: none;
+}
+
 /* ---- Compact mode ---- */
 
 body.compact .container {
@@ -654,6 +678,11 @@ body.compact .author-credit {
 body.compact .btn-start {
   padding: 12px 14px;
   font-size: 14px;
+}
+
+body.compact .btn-report-bug {
+  padding: 6px 10px;
+  font-size: 10px;
 }
 
 body.compact .status-bar {

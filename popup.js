@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnClear = document.getElementById('btn-clear');
   const btnSave = document.getElementById('btn-save');
   const btnStart = document.getElementById('btn-start');
+  const btnReportBug = document.getElementById('btn-report-bug');
   const btnCompact = document.getElementById('btn-compact');
   const btnClearLogs = document.getElementById('btn-clear-logs');
   const configStatus = document.getElementById('config-status');
@@ -379,6 +380,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const isCompact = body.classList.contains('compact');
     setCompactMode(!isCompact, true);
   });
+
+  if (btnReportBug) {
+    btnReportBug.addEventListener('click', () => {
+      const version = (chrome.runtime.getManifest() && chrome.runtime.getManifest().version) || 'inconnue';
+      const browser = navigator.userAgent || 'inconnu';
+      const title = encodeURIComponent('[Bug] Decrire le probleme en une phrase');
+      const body = encodeURIComponent(
+        '## Description\n' +
+        'Expliquez le comportement observe.\n\n' +
+        '## Etapes pour reproduire\n' +
+        '1. ...\n' +
+        '2. ...\n' +
+        '3. ...\n\n' +
+        '## Resultat attendu\n' +
+        '...\n\n' +
+        '## Resultat obtenu\n' +
+        '...\n\n' +
+        `## Infos techniques\n- Version CheckMate: ${version}\n- Navigateur: ${browser}`
+      );
+      const url = `https://github.com/MattiaPARRINELLO/CheckMate/issues/new?title=${title}&body=${body}`;
+      chrome.tabs.create({ url });
+    });
+  }
 
   btnClearLogs.addEventListener('click', () => {
     chrome.storage.local.set({ [EXECUTION_LOG_KEY]: [] }, () => {
