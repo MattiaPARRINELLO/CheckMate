@@ -8,15 +8,49 @@ const URL_CONNEXION = 'https://cesar.emineo-informatique.fr/connexion';
 const URL_TABLEAU_BORD = 'https://cesar.emineo-informatique.fr/';
 const TIMEOUT_CHARGEMENT = 30000; // 30 secondes (site lent)
 const TIMEOUT_REDIRECTION = 30000; // 30 secondes (site lent)
+const EXECUTION_LOG_KEY = 'executionLogs';
+const MAX_EXECUTION_LOGS = 40;
+
+const SITE_SELECTORS = {
+  calendrierJour: [
+    'div.toastui-calendar-layout.toastui-calendar-day-view',
+    '.toastui-calendar-day-view',
+    '[class*="toastui-calendar-day-view"]'
+  ]
+};
+
+/**
+ * Persist un log pour affichage dans le popup
+ * @param {string} tag
+ * @param {string} message
+ * @param {'info'|'success'|'error'} level
+ */
+function appendExecutionLog(tag, message, level = 'info') {
+  const entry = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    ts: new Date().toISOString(),
+    source: 'background',
+    tag,
+    message,
+    level
+  };
+
+  chrome.storage.local.get([EXECUTION_LOG_KEY], (result) => {
+    const logs = Array.isArray(result[EXECUTION_LOG_KEY]) ? result[EXECUTION_LOG_KEY] : [];
+    logs.unshift(entry);
+    chrome.storage.local.set({ [EXECUTION_LOG_KEY]: logs.slice(0, MAX_EXECUTION_LOGS) });
+  });
+}
 
 /**
  * Log horodaté pour faciliter le debug
  * @param {string} tag - Catégorie du log (ex: 'Étape 1')
  * @param {string} message - Message à afficher
  */
-function log(tag, message) {
+function log(tag, message, level = 'info') {
   const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
   console.log(`[${now}][${tag}] ${message}`);
+  appendExecutionLog(tag, message, level);
 }
 
 // =============================================
@@ -98,6 +132,57 @@ function attendreRedirection(tabId, urlActuelle, timeout = TIMEOUT_REDIRECTION) 
 }
 
 /**
+ * Attend qu'un sélecteur soit présent dans un onglet, en interrogeant périodiquement le DOM.
+ * @param {number} tabId - ID de l'onglet
+ * @param {string} selector - Sélecteur CSS à attendre
+ * @param {number} timeout - Timeout global en millisecondes
+ * @param {number} intervalMs - Intervalle entre deux vérifications
+ * @returns {Promise<boolean>} true si trouvé, false sinon
+ */
+async function attendreSelecteurDansOnglet(tabId, selector, timeout = 45000, intervalMs = 1000) {
+  const startedAt = Date.now();
+  let tentatives = 0;
+
+  while (Date.now() - startedAt < timeout) {
+    tentatives += 1;
+    try {
+      const found = await executerScript(tabId, (sel) => !!document.querySelector(sel), [selector]);
+      if (found) {
+        log('Pré-signature', `Sélecteur trouvé: ${selector} (tentative ${tentatives})`);
+        return true;
+      }
+      log('Pré-signature', `Sélecteur non trouvé (${selector}) — tentative ${tentatives}`);
+    } catch (e) {
+      log('Pré-signature', `Injection indisponible (tentative ${tentatives}) : ${e.message}`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  log('Pré-signature', `Timeout atteint sans trouver: ${selector}`);
+  return false;
+}
+
+/**
+ * Lance le message de signature vers le content script.
+ * @param {number} tabId - ID de l'onglet
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function lancerSignatureViaContentScript(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { action: 'lancerSignature' }, (response) => {
+      if (chrome.runtime.lastError) {
+        log('Pointage', `Erreur sendMessage: ${chrome.runtime.lastError.message}`);
+        resolve({ success: false, error: chrome.runtime.lastError.message });
+      } else {
+        log('Pointage', `Réponse du content script: ${JSON.stringify(response)}`);
+        resolve(response || { success: false, error: 'Aucune réponse du content script' });
+      }
+    });
+  });
+}
+
+/**
  * Exécute un script dans un onglet via chrome.scripting.executeScript
  * @param {number} tabId - ID de l'onglet
  * @param {Function} func - Fonction à exécuter
@@ -171,11 +256,10 @@ async function verifierSiDejaConnecte(tabId) {
 
     // Vérifier la présence du calendrier TOASTUI dans le DOM
     try {
-      const calendrierPresent = await executerScript(tabId, () => {
-        return !!document.querySelector(
-          'div.toastui-calendar-layout.toastui-calendar-day-view'
-        );
-      });
+      const calendrierSelectors = SITE_SELECTORS.calendrierJour;
+      const calendrierPresent = await executerScript(tabId, (selectors) => {
+        return selectors.some((selector) => !!document.querySelector(selector));
+      }, [calendrierSelectors]);
       if (calendrierPresent) {
         log('Session', `Tentative ${i + 1}/${MAX_TENTATIVES} — calendrier TOASTUI détecté, session active`);
         return true;
@@ -347,29 +431,36 @@ async function lancerPointage() {
       afficherNotification('✅ Pointage Auto', 'Connexion réussie ! Lancement de la signature...');
     } // fin du else (connexion nécessaire)
 
-    // ÉTAPE 4 — Lancer la signature automatique via le content script
-    log('Pointage', `Étape 4 — Envoi du message 'lancerSignature' au content script (tabId=${tabId})...`);
+    // ÉTAPE 4 — Préparer la page de signature (site potentiellement lent)
+    log('Pointage', 'Étape 4 — Préparation de la page de signature (attente du bouton)...');
+    const boutonPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 45000, 1000);
+    if (!boutonPret) {
+      throw new Error('Le bouton de signature est resté introuvable après attente prolongée (45s)');
+    }
+
+    // ÉTAPE 5 — Lancer la signature automatique via le content script
+    log('Pointage', `Étape 5 — Envoi du message 'lancerSignature' au content script (tabId=${tabId})...`);
     afficherNotification('🕐 Pointage Auto', 'Signature en cours...');
 
-    const resultatSignature = await new Promise((resolve) => {
-      chrome.tabs.sendMessage(tabId, { action: 'lancerSignature' }, (response) => {
-        if (chrome.runtime.lastError) {
-          log('Pointage', `Erreur sendMessage: ${chrome.runtime.lastError.message}`);
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          log('Pointage', `Réponse du content script: ${JSON.stringify(response)}`);
-          resolve(response || { success: false, error: 'Aucune réponse du content script' });
-        }
-      });
-    });
+    let resultatSignature = await lancerSignatureViaContentScript(tabId);
+
+    // Retry ciblé: cas fréquent juste après login où le DOM met encore quelques secondes à stabiliser.
+    if (!resultatSignature.success && resultatSignature.error && resultatSignature.error.includes('Aucun bouton de signature trouvé')) {
+      log('Pointage', 'Étape 5 — Premier essai sans bouton trouvé, attente supplémentaire de 10s puis retry...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+      const boutonRetryPret = await attendreSelecteurDansOnglet(tabId, 'button.buttonPresent', 20000, 1000);
+      if (boutonRetryPret) {
+        resultatSignature = await lancerSignatureViaContentScript(tabId);
+      }
+    }
 
     if (!resultatSignature.success) {
-      log('Pointage', `Étape 4 échouée: ${resultatSignature.error}`);
+      log('Pointage', `Étape 5 échouée: ${resultatSignature.error}`);
       throw new Error(resultatSignature.error || 'Échec de la signature');
     }
 
     // Signature réussie — Notification finale
-    log('Pointage', 'Étape 4 terminée — Signature validée avec succès !');
+    log('Pointage', 'Étape 5 terminée — Signature validée avec succès !', 'success');
     afficherNotification('✅ Pointage Auto', 'Présence pointée et signée avec succès !');
 
     return {
@@ -378,7 +469,7 @@ async function lancerPointage() {
     };
 
   } catch (erreur) {
-    log('Pointage', `ERREUR FATALE: ${erreur.message}`);
+    log('Pointage', `ERREUR FATALE: ${erreur.message}`, 'error');
     console.error('[Pointage] Stack:', erreur.stack);
     afficherNotification('❌ Pointage Auto — Erreur', erreur.message);
 

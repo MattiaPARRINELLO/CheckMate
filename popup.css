@@ -1,9 +1,11 @@
 /* =============================================
-   Pointage Auto — Styles du popup
-   Thème sombre moderne
+   CheckMate — Popup Styles
+   Modern dark glassmorphism theme
    ============================================= */
 
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -11,13 +13,11 @@
 
 body {
   width: 380px;
-  font-family:
-    system-ui,
-    -apple-system,
-    sans-serif;
-  background-color: #1a1a2e;
-  color: #e0e0e0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(145deg, #0c0e1a 0%, #141829 50%, #0f1221 100%);
+  color: #c8d6e5;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
@@ -27,61 +27,321 @@ body {
   gap: 16px;
 }
 
-/* ---- Titre ---- */
+/* ---- Header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 0 2px;
+  position: relative;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6c5ce7 0%, #a855f7 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(108, 92, 231, 0.35);
+}
 
 .title {
-  text-align: center;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 800;
   color: #ffffff;
-  letter-spacing: 0.5px;
+  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #ffffff 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* ---- Indicateur de configuration ---- */
-
-.config-status {
-  text-align: center;
-  padding: 8px 12px;
+.compact-toggle {
+  position: absolute;
+  right: 0;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.config-status.configured {
-  background-color: rgba(29, 185, 84, 0.15);
-  color: #1db954;
-  border: 1px solid rgba(29, 185, 84, 0.3);
+.compact-toggle:hover {
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-.config-status.not-configured {
-  background-color: rgba(255, 183, 0, 0.12);
-  color: #ffb700;
-  border: 1px solid rgba(255, 183, 0, 0.3);
+.compact-toggle[aria-pressed='true'] {
+  color: #c4b5fd;
+  border-color: rgba(168, 85, 247, 0.5);
+  background: rgba(168, 85, 247, 0.15);
 }
 
-/* ---- Sections ---- */
+/* ---- Hero ---- */
 
-.section {
-  background-color: #16213e;
-  border-radius: 10px;
-  padding: 16px;
+.hero {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
 
-.section-title {
-  font-size: 14px;
+/* ---- Config status badge ---- */
+
+.config-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 11px;
   font-weight: 600;
-  color: #a0b4d0;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.3px;
+  transition: all 0.3s ease;
 }
 
-/* ---- Champs de formulaire ---- */
+.config-status .status-icon {
+  flex-shrink: 0;
+}
+
+.config-status.configured {
+  background: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.config-status.not-configured {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* ---- Status bar ---- */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  line-height: 1.4;
+  backdrop-filter: blur(8px);
+}
+
+.status-bar-icon {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+/* ---- Execution log panel ---- */
+
+.log-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.log-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+}
+
+.log-clear {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.log-clear:hover {
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.execution-log-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.execution-log-list li {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.execution-log-list .empty {
+  text-align: center;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.log-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.log-tag {
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.log-time {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.log-message {
+  font-size: 11px;
+  line-height: 1.3;
+  color: #cbd5e1;
+}
+
+.log-level-success .log-tag {
+  color: #34d399;
+}
+
+.log-level-error .log-tag {
+  color: #f87171;
+}
+
+/* ---- Config panel (details / summary) ---- */
+
+.config-panel {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.3s ease;
+}
+
+.config-panel:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.config-panel[open] {
+  padding-bottom: 16px;
+  border-color: rgba(168, 85, 247, 0.15);
+}
+
+.config-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.2px;
+  list-style: none;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.config-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.config-toggle .chevron {
+  margin-left: auto;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.5;
+}
+
+.config-panel[open] > .config-toggle .chevron {
+  transform: rotate(90deg);
+}
+
+.config-toggle:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.config-panel > .section {
+  margin: 0 14px;
+}
+
+.config-panel > .btn-save {
+  margin: 4px 14px 0;
+}
+
+/* ---- Sections (cards) ---- */
+
+.section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  backdrop-filter: blur(8px);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.section-title svg {
+  opacity: 0.6;
+}
+
+/* ---- Form fields ---- */
 
 .field-group {
   display: flex;
@@ -90,50 +350,75 @@ body {
 }
 
 .field-group label {
-  font-size: 12px;
-  color: #8899aa;
+  font-size: 11px;
+  color: #64748b;
   font-weight: 500;
+  padding-left: 2px;
 }
 
-.field-group input {
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: #475569;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.input-wrapper input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 34px;
   border-radius: 8px;
-  border: 1px solid #2a3a5c;
-  background-color: #0f1a30;
-  color: #e0e0e0;
-  font-size: 14px;
-  font-family: system-ui, sans-serif;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+  color: #e2e8f0;
+  font-size: 13px;
+  font-family: inherit;
   outline: none;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
 
-.field-group input::placeholder {
-  color: #556677;
+.input-wrapper input::placeholder {
+  color: #475569;
 }
 
-.field-group input:focus {
-  border-color: #0f3460;
-  box-shadow: 0 0 0 3px rgba(15, 52, 96, 0.3);
+.input-wrapper input:focus {
+  border-color: rgba(168, 85, 247, 0.4);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+}
+
+.input-wrapper input:focus ~ .input-icon,
+.input-wrapper:focus-within .input-icon {
+  color: #a855f7;
 }
 
 /* ---- Canvas signature ---- */
 
 .canvas-wrapper {
   position: relative;
-  width: 320px;
-  height: 150px;
+  width: 100%;
+  height: 140px;
   margin: 0 auto;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 2px solid #2a3a5c;
-  background-color: #ffffff;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.95);
+  transition: border-color 0.2s ease;
+}
+
+.canvas-wrapper:hover {
+  border-color: rgba(168, 85, 247, 0.3);
 }
 
 .canvas-wrapper canvas {
   display: block;
+  width: 100%;
+  height: 100%;
   cursor: crosshair;
 }
 
@@ -144,11 +429,12 @@ body {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #aaaaaa;
-  font-size: 14px;
-  font-style: italic;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 12px;
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
@@ -157,99 +443,200 @@ body {
   opacity: 0;
 }
 
-/* ---- Boutons ---- */
+/* ---- Buttons ---- */
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
   padding: 10px 16px;
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
-  font-family: system-ui, sans-serif;
+  font-family: inherit;
   cursor: pointer;
-  transition:
-    transform 0.15s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(255,255,255,0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.btn:hover::after {
+  opacity: 1;
 }
 
 .btn:active {
-  transform: translateY(0);
-  box-shadow: none;
+  transform: scale(0.98);
 }
 
+.btn-icon {
+  flex-shrink: 0;
+}
+
+/* -- Clear button -- */
+
 .btn-clear {
-  background-color: transparent;
-  color: #8899aa;
-  border: 1px solid #2a3a5c;
-  font-size: 12px;
+  background: transparent;
+  color: #64748b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
   padding: 6px 12px;
   width: auto;
   align-self: flex-end;
-  margin-top: -4px;
+  border-radius: 6px;
+  gap: 5px;
 }
 
 .btn-clear:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  color: #ff6b6b;
-  border-color: #ff6b6b;
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
 }
 
-/* ---- Actions ---- */
+.btn-clear::after { display: none; }
 
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+/* -- Save button -- */
 
 .btn-save {
-  background-color: #0f3460;
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
 }
 
 .btn-save:hover {
-  background-color: #133d75;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* -- Start (CTA) button -- */
+
 .btn-start {
-  background-color: #1db954;
+  background: linear-gradient(135deg, #6c5ce7 0%, #a855f7 100%);
   color: #ffffff;
-  font-size: 16px;
-  padding: 14px 16px;
-  letter-spacing: 0.3px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 16px 20px;
+  border-radius: 14px;
+  letter-spacing: 0.2px;
+  box-shadow:
+    0 4px 15px rgba(108, 92, 231, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .btn-start:hover {
-  background-color: #1ed760;
+  box-shadow:
+    0 6px 25px rgba(108, 92, 231, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-start:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow:
+    0 2px 10px rgba(108, 92, 231, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .btn-start:disabled {
-  background-color: #2a3a5c;
-  color: #556677;
+  background: rgba(255, 255, 255, 0.04);
+  color: #475569;
+  box-shadow: none;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-/* ---- Barre de statut ---- */
+.btn-start:disabled::after { display: none; }
 
-.status-bar {
-  text-align: center;
-  font-size: 12px;
-  color: #667788;
+.btn-start.loading {
+  background: linear-gradient(135deg, #6c5ce7 0%, #a855f7 100%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Spinner animation for loading state */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Subtle pulse on the CTA when ready */
+@keyframes pulse-ring {
+  0% { box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3), 0 0 0 0 rgba(108, 92, 231, 0.25); }
+  70% { box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3), 0 0 0 8px rgba(108, 92, 231, 0); }
+  100% { box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3), 0 0 0 0 rgba(108, 92, 231, 0); }
+}
+
+.btn-start:not(:disabled):not(.loading) {
+  animation: pulse-ring 2.5s ease-out infinite;
+}
+
+.btn-start:not(:disabled):not(.loading):hover {
+  animation: none;
+}
+
+/* ---- Compact mode ---- */
+
+body.compact .container {
+  gap: 10px;
+  padding: 14px;
+}
+
+body.compact .header {
+  padding-top: 0;
+}
+
+body.compact .logo {
+  width: 30px;
+  height: 30px;
+}
+
+body.compact .title {
+  font-size: 18px;
+}
+
+body.compact .btn-start {
+  padding: 12px 14px;
+  font-size: 14px;
+}
+
+body.compact .status-bar {
+  padding: 8px 10px;
+  font-size: 10px;
+}
+
+body.compact .execution-log-list {
+  max-height: 86px;
+}
+
+body.compact .config-toggle {
+  padding: 10px 12px;
+}
+
+body.compact .section {
   padding: 10px;
-  background-color: #16213e;
-  border-radius: 8px;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1.4;
+  gap: 8px;
+}
+
+body.compact .input-wrapper input {
+  padding: 8px 10px 8px 30px;
+  font-size: 12px;
+}
+
+body.compact .canvas-wrapper {
+  height: 110px;
 }
